@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="beige">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logic Organizer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  /* ---- THEMES ---- */
+  :root[data-theme="beige"] {
+    --bg: #F8F7F4; --surface: #FFFFFF; --border: #E2E0DA; --text: #1A1917; --muted: #7A7870;
+    --green: #1B6B47; --green-light: #EAF4EE;
+    --amber: #92600A; --amber-light: #FEF3DC;
+    --red: #A8292A; --red-light: #FDEAEA;
+    --topbar-bg: #1A1917; --topbar-text: #F8F7F4;
+    --hover: #FAFAF8; --table-header: #F5F4F0;
+  }
+  :root[data-theme="white"] {
+    --bg: #FFFFFF; --surface: #FAFAFA; --border: #E5E5E5; --text: #111111; --muted: #6B6B6B;
+    --green: #0F5132; --green-light: #E8F2EC;
+    --amber: #7A4F00; --amber-light: #FCF0D9;
+    --red: #8B1F1F; --red-light: #FBE5E5;
+    --topbar-bg: #111111; --topbar-text: #FFFFFF;
+    --hover: #F2F2F2; --table-header: #F0F0F0;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E0E10; --surface: #18181B; --border: #2A2A2E; --text: #F5F5F4; --muted: #8E8E93;
+    --green: #4ADE80; --green-light: #14321F;
+    --amber: #FACC15; --amber-light: #3B2F08;
+    --red: #F87171; --red-light: #3D1414;
+    --topbar-bg: #000000; --topbar-text: #F5F5F4;
+    --hover: #1F1F23; --table-header: #1A1A1D;
+  }
+  :root[data-theme="blue"] {
+    --bg: #0A1628; --surface: #112138; --border: #1F3654; --text: #E8EEF7; --muted: #8B9AAF;
+    --green: #6EE7B7; --green-light: #0F2F22;
+    --amber: #FCD34D; --amber-light: #2F260A;
+    --red: #FCA5A5; --red-light: #2F1212;
+    --topbar-bg: #050D1A; --topbar-text: #E8EEF7;
+    --hover: #162B47; --table-header: #0E1D32;
+  }
+
+  :root { --mono: 'JetBrains Mono', monospace; --sans: 'DM Sans', sans-serif; }
+
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+  .topbar-logo-img { height: 28px; display: flex; align-items: center; }
+  .topbar-logo-img-el {
+    height: 28px;
+    width: auto;
+    /* Logo is white on black — invert on light themes */
+    filter: brightness(0) invert(1);
+    opacity: 0.92;
+    transition: filter 0.25s, opacity 0.25s;
+  }
+  /* On beige/white theme: make logo dark */
+  :root[data-theme="beige"] .topbar-logo-img-el,
+  :root[data-theme="white"] .topbar-logo-img-el {
+    filter: brightness(0) invert(1);
+    opacity: 0.92;
+  }
+  :root[data-theme="dark"] .topbar-logo-img-el,
+  :root[data-theme="blue"] .topbar-logo-img-el {
+    filter: brightness(0) invert(1);
+    opacity: 0.92;
+  }
+  .topbar-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255,255,255,0.2);
+  }
+  .topbar-subtitle {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.25s, color 0.25s; }
+
+  /* TOPBAR */
+  .topbar { background: var(--topbar-bg); padding: 12px 48px; display: flex; align-items: center; justify-content: space-between; transition: background 0.25s; position: sticky; top: 0; z-index: 100; }
+  .topbar-logo { font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: 0.14em; color: var(--topbar-text); text-transform: uppercase; }
+  .topbar-actions { display: flex; align-items: center; gap: 10px; }
+  .lang-switcher { display: flex; background: rgba(255,255,255,0.06); border-radius: 6px; padding: 3px; }
+  .lang-btn { background: transparent; border: none; color: rgba(255,255,255,0.55); font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; padding: 6px 12px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+  .lang-btn:hover { color: var(--topbar-text); }
+  .lang-btn.active { background: var(--topbar-text); color: var(--topbar-bg); }
+  .icon-btn { background: rgba(255,255,255,0.06); border: none; color: rgba(255,255,255,0.7); width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .icon-btn:hover { background: rgba(255,255,255,0.12); color: var(--topbar-text); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  /* SEARCH BAR */
+  .search-container { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 48px; transition: all 0.25s; }
+  .search-box { max-width: 900px; margin: 0 auto; position: relative; }
+  .search-input { width: 100%; padding: 10px 14px 10px 38px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-family: var(--sans); font-size: 13px; outline: none; transition: all 0.15s; }
+  .search-input:focus { border-color: var(--text); }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 16px; height: 16px; }
+  .search-clear { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 18px; height: 18px; cursor: pointer; display: none; padding: 2px; border-radius: 3px; }
+  .search-clear.visible { display: block; }
+  .search-clear:hover { background: var(--hover); color: var(--text); }
+
+  /* SETTINGS PANEL */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+  .settings-panel, .qr-panel { position: fixed; top: 60px; right: 48px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; width: 340px; z-index: 1000; box-shadow: 0 12px 48px rgba(0,0,0,0.25); opacity: 0; transform: translateY(-8px); pointer-events: none; transition: all 0.2s ease-out; }
+  .settings-panel.open, .qr-panel.open { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .panel-title { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+  .settings-section { margin-bottom: 18px; }
+  .settings-section:last-child { margin-bottom: 0; }
+  .settings-section-label { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+  .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .theme-option { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s; }
+  .theme-option:hover { border-color: var(--muted); }
+  .theme-option.active { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--text); }
+  .theme-swatch { width: 28px; height: 28px; border-radius: 5px; border: 1px solid var(--border); flex-shrink: 0; }
+  .swatch-beige { background: linear-gradient(135deg, #F8F7F4 50%, #1A1917 50%); }
+  .swatch-white { background: linear-gradient(135deg, #FFFFFF 50%, #111111 50%); }
+  .swatch-dark  { background: linear-gradient(135deg, #0E0E10 50%, #4ADE80 50%); }
+  .swatch-blue  { background: linear-gradient(135deg, #0A1628 50%, #6EE7B7 50%); }
+  .theme-label { font-size: 12px; color: var(--text); font-weight: 500; }
+  .lang-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .lang-option { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; cursor: pointer; text-align: center; font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); transition: all 0.15s; }
+  .lang-option:hover { border-color: var(--muted); }
+  .lang-option.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .export-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; cursor: pointer; font-size: 12px; color: var(--text); font-weight: 500; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .export-btn:hover { background: var(--hover); border-color: var(--muted); }
+  .export-btn svg { width: 13px; height: 13px; }
+
+  /* QR PANEL */
+  .qr-panel { width: 280px; text-align: center; }
+  .qr-code-wrap { background: white; padding: 16px; border-radius: 8px; display: inline-block; margin: 10px 0; }
+  #qrcode img, #qrcode canvas { display: block; }
+  .qr-url { font-family: var(--mono); font-size: 10px; color: var(--muted); word-break: break-all; margin-top: 8px; padding: 8px; background: var(--bg); border-radius: 5px; }
+
+  /* HERO */
+  .hero { background: var(--surface); border-bottom: 1px solid var(--border); padding: 56px 48px 44px; transition: background 0.25s, border-color 0.25s; }
+  .hero-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 18px; }
+  .hero-title { font-size: clamp(30px, 4vw, 50px); font-weight: 300; letter-spacing: -0.025em; line-height: 1.08; margin-bottom: 14px; }
+  .hero-title strong { font-weight: 600; }
+  .hero-sub { font-size: 14px; color: var(--muted); max-width: 560px; line-height: 1.6; }
+
+  .main { max-width: 900px; margin: 0 auto; padding: 52px 48px 96px; display: grid; gap: 44px; }
+  .section { transition: opacity 0.2s; }
+  .section.hidden { display: none; }
+
+  .section-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 12px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* FORMULA */
+  .formula-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 26px 28px 20px; transition: background 0.25s, border-color 0.25s; }
+  .formula-parts { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-bottom: 16px; }
+  .fp { font-family: var(--mono); font-size: 14px; font-weight: 600; padding: 7px 13px; border-radius: 5px; }
+  .fp-type { background: var(--green-light); color: var(--green); }
+  .fp-num  { background: var(--amber-light); color: var(--amber); }
+  .fp-sep  { background: transparent; color: var(--muted); padding: 7px 3px; font-weight: 400; font-size: 16px; }
+  .fp-ver  { background: var(--red-light); color: var(--red); }
+  .formula-legend { display: flex; gap: 20px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--border); }
+  .fl-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
+  .fl-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+
+  /* LEGEND */
+  .legend-table { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; transition: background 0.25s, border-color 0.25s; }
+  .legend-row { display: grid; grid-template-columns: 52px 1fr; border-bottom: 1px solid var(--border); transition: background 0.12s; }
+  .legend-row:last-child { border-bottom: none; }
+  .legend-row:hover { background: var(--hover); }
+  .legend-key { font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--green); padding: 15px 0 15px 22px; display: flex; align-items: center; border-right: 1px solid var(--border); }
+  .legend-desc { padding: 15px 22px; font-size: 13px; color: var(--text); display: flex; align-items: center; }
+
+  /* VERSIONS */
+  .version-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .version-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px 24px; transition: background 0.25s, border-color 0.25s; }
+  .version-card-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .vc-code { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+  .vc-badge { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 9px; border-radius: 3px; }
+  .vc-badge-obj { background: var(--amber-light); color: var(--amber); }
+  .vc-badge-ver { background: var(--red-light); color: var(--red); }
+  .vc-desc { font-size: 12px; color: var(--muted); line-height: 1.65; margin-bottom: 12px; }
+  .vc-examples { display: flex; flex-direction: column; gap: 5px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .vc-ex { font-family: var(--mono); font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .vc-ex strong { color: var(--text); font-weight: 600; }
+  .vc-arrow { color: var(--border); }
+
+  /* WORKFLOW DIAGRAM */
+  .workflow-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 32px 24px; transition: background 0.25s, border-color 0.25s; }
+  .workflow { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .wf-node { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; font-size: 13px; color: var(--text); text-align: center; min-width: 220px; max-width: 380px; font-weight: 500; }
+  .wf-node.start { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+  .wf-node.question { background: var(--amber-light); border-color: var(--amber); color: var(--amber); font-weight: 600; }
+  .wf-arrow { color: var(--muted); font-size: 18px; line-height: 1; }
+  .wf-branch { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
+  .wf-side { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .wf-label { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .wf-result { background: var(--green-light); color: var(--green); border-color: var(--green); font-weight: 600; font-family: var(--mono); font-size: 12px; }
+  .wf-result.red { background: var(--red-light); color: var(--red); border-color: var(--red); }
+
+  /* EXAMPLES */
+  .proj-input-row { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 22px; margin-bottom: 12px; flex-wrap: wrap; transition: background 0.25s, border-color 0.25s; }
+  .proj-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; color: var(--muted); white-space: nowrap; }
+  #projInput { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--amber); background: var(--amber-light); border: 1px solid var(--amber); border-radius: 5px; padding: 7px 14px; outline: none; width: 180px; letter-spacing: 0.05em; transition: all 0.15s; }
+  #projInput:focus { box-shadow: 0 0 0 3px var(--amber-light); }
+  .proj-hint { font-size: 11px; color: var(--muted); font-style: italic; }
+
+  .examples-table { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; transition: background 0.25s, border-color 0.25s; }
+  .ex-header { display: grid; grid-template-columns: 240px 1fr 50px; background: var(--table-header); border-bottom: 1px solid var(--border); padding: 10px 22px; }
+  .ex-header span { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+  .ex-row { display: grid; grid-template-columns: 240px 1fr 50px; border-bottom: 1px solid var(--border); transition: background 0.12s; padding: 0 22px; align-items: center; }
+  .ex-row:last-child { border-bottom: none; }
+  .ex-row:hover { background: var(--hover); }
+  .ex-code { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--green); padding: 14px 20px 14px 0; border-right: 1px solid var(--border); display: flex; align-items: center; cursor: pointer; transition: color 0.15s; }
+  .ex-code:hover { opacity: 0.7; }
+  .ex-desc { padding: 14px 0 14px 20px; font-size: 12px; color: var(--muted); display: flex; align-items: center; }
+  .copy-btn { background: transparent; border: none; padding: 6px; cursor: pointer; color: var(--muted); border-radius: 4px; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+  .copy-btn:hover { background: var(--hover); color: var(--text); }
+  .copy-btn svg { width: 14px; height: 14px; }
+  .copy-btn.copied { color: var(--green); }
+
+  /* CHANGELOG */
+  .changelog-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; transition: background 0.25s, border-color 0.25s; }
+  .cl-entry { display: grid; grid-template-columns: 130px 1fr; border-bottom: 1px solid var(--border); padding: 16px 22px; }
+  .cl-entry:last-child { border-bottom: none; }
+  .cl-date { font-family: var(--mono); font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  .cl-version { background: var(--green-light); color: var(--green); padding: 2px 8px; border-radius: 3px; font-weight: 700; display: inline-block; width: fit-content; }
+  .cl-changes { font-size: 13px; color: var(--text); }
+  .cl-changes ul { list-style: none; padding: 0; }
+  .cl-changes li { padding: 3px 0; padding-left: 14px; position: relative; color: var(--muted); }
+  .cl-changes li::before { content: '→'; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: all 0.25s ease-out; z-index: 2000; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  footer { border-top: 1px solid var(--border); padding: 20px 48px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); font-family: var(--mono); background: var(--surface); transition: background 0.25s, border-color 0.25s; }
+
+  @media (max-width: 640px) {
+    .topbar, .hero, .main, footer, .search-container { padding-left: 20px; padding-right: 20px; }
+    .topbar { flex-direction: column; gap: 10px; }
+    .settings-panel, .qr-panel { right: 20px; left: 20px; width: auto; }
+    .version-grid { grid-template-columns: 1fr; }
+    .ex-header, .ex-row { grid-template-columns: 1fr 50px; }
+    .ex-code { border-right: none; border-bottom: 1px solid var(--border); grid-column: 1 / 3; padding-right: 0; }
+    .ex-desc { padding-left: 0; grid-column: 1; }
+    .cl-entry { grid-template-columns: 1fr; gap: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo-img">
+      <img src="data:image/png;base64,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" alt="Netpowersafe" class="topbar-logo-img-el" />
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-subtitle">Logic Organizer</div>
+  </div>
+  <div class="topbar-actions">
+    <div class="lang-switcher">
+      <button class="lang-btn active" data-lang="de" onclick="setLang('de')">DE</button>
+      <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">FR</button>
+      <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" data-lang="it" onclick="setLang('it')">IT</button>
+    </div>
+    <button class="icon-btn" onclick="toggleQR()" title="QR Code">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        <line x1="14" y1="14" x2="14" y2="17"/><line x1="14" y1="20" x2="14" y2="21"/>
+        <line x1="17" y1="14" x2="21" y2="14"/><line x1="20" y1="17" x2="21" y2="17"/>
+        <line x1="17" y1="17" x2="17" y2="21"/><line x1="20" y1="20" x2="21" y2="20"/>
+      </svg>
+    </button>
+    <button class="icon-btn" onclick="window.print()" title="Print">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+      </svg>
+    </button>
+    <button class="icon-btn" onclick="toggleSettings()" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="search-container">
+  <div class="search-box">
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input class="search-input" id="searchInput" type="text" placeholder="Suchen..." oninput="handleSearch()" />
+    <svg class="search-clear" id="searchClear" onclick="clearSearch()" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeAllPanels()"></div>
+
+<div class="settings-panel" id="settingsPanel">
+  <div class="panel-title" id="settingsTitleEl">Einstellungen</div>
+  <div class="settings-section">
+    <div class="settings-section-label" id="settingsThemeLbl">Theme</div>
+    <div class="theme-grid">
+      <div class="theme-option" data-theme="beige" onclick="setTheme('beige')"><div class="theme-swatch swatch-beige"></div><div class="theme-label" data-theme-name="beige">Beige</div></div>
+      <div class="theme-option" data-theme="white" onclick="setTheme('white')"><div class="theme-swatch swatch-white"></div><div class="theme-label" data-theme-name="white">Weiss</div></div>
+      <div class="theme-option" data-theme="dark" onclick="setTheme('dark')"><div class="theme-swatch swatch-dark"></div><div class="theme-label" data-theme-name="dark">Dark</div></div>
+      <div class="theme-option" data-theme="blue" onclick="setTheme('blue')"><div class="theme-swatch swatch-blue"></div><div class="theme-label" data-theme-name="blue">Blau</div></div>
+    </div>
+  </div>
+  <div class="settings-section">
+    <div class="settings-section-label" id="settingsLangLbl">Sprache</div>
+    <div class="lang-grid">
+      <div class="lang-option" data-lang="de" onclick="setLang('de')">DE</div>
+      <div class="lang-option" data-lang="fr" onclick="setLang('fr')">FR</div>
+      <div class="lang-option" data-lang="en" onclick="setLang('en')">EN</div>
+      <div class="lang-option" data-lang="it" onclick="setLang('it')">IT</div>
+    </div>
+  </div>
+  <div class="settings-section">
+    <div class="settings-section-label" id="settingsExportLbl">Export</div>
+    <div class="export-grid">
+      <button class="export-btn" onclick="exportPDF()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        PDF
+      </button>
+      <button class="export-btn" onclick="exportExcel()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+        Excel
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="qr-panel" id="qrPanel">
+  <div class="panel-title" id="qrTitleEl">QR Code</div>
+  <div class="qr-code-wrap"><div id="qrcode"></div></div>
+  <div class="qr-url" id="qrUrl"></div>
+</div>
+
+<div class="hero">
+  <div class="hero-label" id="heroLabel"></div>
+  <h1 class="hero-title" id="heroTitle"></h1>
+  <p class="hero-sub" id="heroSub"></p>
+</div>
+
+<div class="main">
+
+  <div class="section" data-search="struktur structure">
+    <div class="section-label" id="lblStructure"></div>
+    <div class="formula-box">
+      <div class="formula-parts">
+        <span class="fp fp-type" id="fpType"></span>
+        <span class="fp fp-num" id="fpProject"></span>
+        <span class="fp fp-sep">_</span>
+        <span class="fp fp-num" id="fpObject"></span>
+        <span class="fp fp-sep">–</span>
+        <span class="fp fp-ver" id="fpVersion"></span>
+      </div>
+      <div class="formula-legend">
+        <div class="fl-item"><div class="fl-dot" style="background:var(--green)"></div><span id="flType"></span></div>
+        <div class="fl-item"><div class="fl-dot" style="background:var(--amber)"></div><span id="flNum"></span></div>
+        <div class="fl-item"><div class="fl-dot" style="background:var(--red)"></div><span id="flVer"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" data-search="legende legend p a e c s teil pièce assembly zusammenstellung elektroplan kabel cable software">
+    <div class="section-label" id="lblLegend"></div>
+    <div class="legend-table" id="legendTable"></div>
+  </div>
+
+  <div class="section" data-search="versionen versions v1 v2 001 002">
+    <div class="section-label" id="lblVersions"></div>
+    <div class="version-grid">
+      <div class="version-card">
+        <div class="version-card-top">
+          <span class="vc-code" style="color:var(--amber)">_001 / _002</span>
+          <span class="vc-badge vc-badge-obj" id="badgeObj"></span>
+        </div>
+        <p class="vc-desc" id="descObj"></p>
+        <div class="vc-examples">
+          <div class="vc-ex"><strong>P…_001</strong><span class="vc-arrow">→</span><span id="exObj1"></span></div>
+          <div class="vc-ex"><strong>P…_002</strong><span class="vc-arrow">→</span><span id="exObj2"></span></div>
+        </div>
+      </div>
+      <div class="version-card">
+        <div class="version-card-top">
+          <span class="vc-code" style="color:var(--red)">-V1 / -V2</span>
+          <span class="vc-badge vc-badge-ver" id="badgeVer"></span>
+        </div>
+        <p class="vc-desc" id="descVer"></p>
+        <div class="vc-examples">
+          <div class="vc-ex"><strong>…_001-V1</strong><span class="vc-arrow">→</span><span id="exVer1"></span></div>
+          <div class="vc-ex"><strong>…_001-V2</strong><span class="vc-arrow">→</span><span id="exVer2"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" data-search="workflow diagramm flowchart entscheidung">
+    <div class="section-label" id="lblWorkflow"></div>
+    <div class="workflow-box">
+      <div class="workflow">
+        <div class="wf-node start" id="wfStart"></div>
+        <div class="wf-arrow">↓</div>
+        <div class="wf-node question" id="wfQuestion"></div>
+        <div class="wf-branch">
+          <div class="wf-side">
+            <div class="wf-label" id="wfYesLbl"></div>
+            <div class="wf-arrow">↓</div>
+            <div class="wf-node" id="wfYesDesc"></div>
+            <div class="wf-arrow">↓</div>
+            <div class="wf-node wf-result">_002, _003...</div>
+          </div>
+          <div class="wf-side">
+            <div class="wf-label" id="wfNoLbl"></div>
+            <div class="wf-arrow">↓</div>
+            <div class="wf-node" id="wfNoDesc"></div>
+            <div class="wf-arrow">↓</div>
+            <div class="wf-node wf-result red">-V2, -V3...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" data-search="beispiele examples">
+    <div class="section-label" id="lblExamples"></div>
+    <div class="proj-input-row">
+      <span class="proj-label" id="projLabel"></span>
+      <input id="projInput" type="text" value="20260638" oninput="updateExamples()" maxlength="20" />
+      <span class="proj-hint" id="projHint"></span>
+    </div>
+    <div class="examples-table">
+      <div class="ex-header">
+        <span id="hdrCode"></span>
+        <span id="hdrDesc"></span>
+        <span></span>
+      </div>
+      <div class="ex-row"><div class="ex-code" id="ex1" onclick="copyText('ex1', this)"></div><div class="ex-desc" id="exd1"></div><button class="copy-btn" onclick="copyText('ex1', this.previousElementSibling.previousElementSibling.previousElementSibling || document.getElementById('ex1'), this)" title="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+      <div class="ex-row"><div class="ex-code" id="ex2" onclick="copyText('ex2', this)"></div><div class="ex-desc" id="exd2"></div><button class="copy-btn" onclick="copyText('ex2', document.getElementById('ex2'), this)" title="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+      <div class="ex-row"><div class="ex-code" id="ex3" onclick="copyText('ex3', this)"></div><div class="ex-desc" id="exd3"></div><button class="copy-btn" onclick="copyText('ex3', document.getElementById('ex3'), this)" title="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+      <div class="ex-row"><div class="ex-code" id="ex4" onclick="copyText('ex4', this)"></div><div class="ex-desc" id="exd4"></div><button class="copy-btn" onclick="copyText('ex4', document.getElementById('ex4'), this)" title="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+      <div class="ex-row"><div class="ex-code" id="ex5" onclick="copyText('ex5', this)"></div><div class="ex-desc" id="exd5"></div><button class="copy-btn" onclick="copyText('ex5', document.getElementById('ex5'), this)" title="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+      <div class="ex-row"><div class="ex-code" id="ex6" onclick="copyText('ex6', this)"></div><div class="ex-desc" id="exd6"></div><button class="copy-btn" onclick="copyText('ex6', document.getElementById('ex6'), this)" title="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+      <div class="ex-row"><div class="ex-code" id="ex7" onclick="copyText('ex7', this)"></div><div class="ex-desc" id="exd7"></div><button class="copy-btn" onclick="copyText('ex7', document.getElementById('ex7'), this)" title="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+    </div>
+  </div>
+
+  <div class="section" data-search="changelog versionshistorie history historique cronologia">
+    <div class="section-label" id="lblChangelog"></div>
+    <div class="changelog-box" id="changelogBox"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer>
+  <span>Logic Organizer</span>
+  <span>v1.0 · 2026</span>
+</footer>
+
+<script>
+const translations = {
+  de: {
+    settingsTitle: "Einstellungen", settingsTheme: "Theme", settingsLang: "Sprache", settingsExport: "Export",
+    themeNames: { beige: "Beige", white: "Weiss", dark: "Dark", blue: "Blau" },
+    qrTitle: "Diese Seite teilen",
+    heroLabel: "Intern normalisierte Beschreibung",
+    heroTitle: "<strong>System der</strong><br>Bezeichnungen",
+    heroSub: "Einheitlicher Benennungsstandard für alle Projektdateien.",
+    lblStructure: "Struktur", lblLegend: "Legende", lblVersions: "Versionen", lblExamples: "Beispiele",
+    lblWorkflow: "Entscheidungsdiagramm", lblChangelog: "Versionshistorie",
+    searchPlaceholder: "Suchen...", searchNoResults: "Keine Ergebnisse",
+    fpType: "[Typ]", fpProject: "[N° Projekt]", fpObject: "[Objekt]", fpVersion: "[Version]",
+    flType: "Typ (P, A, E, C, S)", flNum: "Projektnummer + Objektnummer", flVer: "Dateiversion",
+    legend: [["P","Teil"],["A","Zusammenstellung"],["E","Elektroplan"],["C","Kabelliste"],["S","Software"]],
+    badgeObj: "Objekt-Nr.", badgeVer: "Version",
+    descObj: "Neues unabhängiges Objekt desselben Typs im Projekt.",
+    descVer: "Überarbeitung desselben Objekts (Korrektur, Änderung).",
+    exObj1: "1. Teil", exObj2: "2. Teil", exVer1: "Original", exVer2: "Korrigiert",
+    projLabel: "N° Projekt →", projHint: "Projektnummer eingeben",
+    hdrCode: "Bezeichnung", hdrDesc: "Beschreibung",
+    examples: ["Erstes CAD-Teil, V1","Erstes Teil, überarbeitet","Zweites CAD-Teil, V1","Erste Zusammenstellung, V1","Erster Elektroplan, V1","Erste Kabelliste, V1","Erstes Programm, V1"],
+    wfStart: "Neue Datei erstellen", wfQuestion: "Ist es ein komplett neues Objekt?",
+    wfYesLbl: "Ja", wfNoLbl: "Nein",
+    wfYesDesc: "Neues unabhängiges Teil/Plan/etc.",
+    wfNoDesc: "Bestehendes Objekt ändern/korrigieren",
+    copied: "Kopiert!",
+    changelog: [
+      { version: "v1.0", date: "Mai 2026", changes: ["Initiales System mit P, A, E, C, S","Versionierung mit _001 und -V1","Mehrsprachige Unterstützung"] }
+    ]
+  },
+  fr: {
+    settingsTitle: "Paramètres", settingsTheme: "Thème", settingsLang: "Langue", settingsExport: "Export",
+    themeNames: { beige: "Beige", white: "Blanc", dark: "Sombre", blue: "Bleu" },
+    qrTitle: "Partager cette page",
+    heroLabel: "Description normalisée interne",
+    heroTitle: "<strong>Système de</strong><br>désignation",
+    heroSub: "Standard de nommage unifié pour tous les fichiers de projet.",
+    lblStructure: "Structure", lblLegend: "Légende", lblVersions: "Versions", lblExamples: "Exemples",
+    lblWorkflow: "Diagramme de décision", lblChangelog: "Historique des versions",
+    searchPlaceholder: "Rechercher...", searchNoResults: "Aucun résultat",
+    fpType: "[Type]", fpProject: "[N° Projet]", fpObject: "[Objet]", fpVersion: "[Version]",
+    flType: "Type (P, A, E, C, S)", flNum: "N° de projet + N° d'objet", flVer: "Version du fichier",
+    legend: [["P","Pièce"],["A","Assemblage"],["E","Schéma électrique"],["C","Liste de câbles"],["S","Logiciel"]],
+    badgeObj: "N° Objet", badgeVer: "Version",
+    descObj: "Nouvel objet indépendant du même type dans le projet.",
+    descVer: "Révision du même objet (correction, modification).",
+    exObj1: "1ère pièce", exObj2: "2ème pièce", exVer1: "Original", exVer2: "Corrigé",
+    projLabel: "N° Projet →", projHint: "Saisir le numéro de projet",
+    hdrCode: "Désignation", hdrDesc: "Description",
+    examples: ["Première pièce CAD, V1","Première pièce, révisée","Deuxième pièce CAD, V1","Premier assemblage CAD, V1","Premier schéma électrique, V1","Première liste de câbles, V1","Premier programme, V1"],
+    wfStart: "Créer un nouveau fichier", wfQuestion: "Est-ce un objet complètement nouveau ?",
+    wfYesLbl: "Oui", wfNoLbl: "Non",
+    wfYesDesc: "Nouvelle pièce/plan indépendant",
+    wfNoDesc: "Modifier/corriger un objet existant",
+    copied: "Copié !",
+    changelog: [
+      { version: "v1.0", date: "Mai 2026", changes: ["Système initial avec P, A, E, C, S","Versionnage avec _001 et -V1","Support multilingue"] }
+    ]
+  },
+  en: {
+    settingsTitle: "Settings", settingsTheme: "Theme", settingsLang: "Language", settingsExport: "Export",
+    themeNames: { beige: "Beige", white: "White", dark: "Dark", blue: "Blue" },
+    qrTitle: "Share this page",
+    heroLabel: "Internal naming standard",
+    heroTitle: "<strong>Designation</strong><br>system",
+    heroSub: "Unified naming standard for all project files.",
+    lblStructure: "Structure", lblLegend: "Legend", lblVersions: "Versions", lblExamples: "Examples",
+    lblWorkflow: "Decision flowchart", lblChangelog: "Version history",
+    searchPlaceholder: "Search...", searchNoResults: "No results",
+    fpType: "[Type]", fpProject: "[Project No.]", fpObject: "[Object]", fpVersion: "[Version]",
+    flType: "Type (P, A, E, C, S)", flNum: "Project number + object number", flVer: "File version",
+    legend: [["P","Piece"],["A","Assembly"],["E","Electrical schema"],["C","Cable list"],["S","Software"]],
+    badgeObj: "Object No.", badgeVer: "Version",
+    descObj: "New independent object of the same type in the project.",
+    descVer: "Revision of the same object (correction, modification).",
+    exObj1: "1st piece", exObj2: "2nd piece", exVer1: "Original", exVer2: "Corrected",
+    projLabel: "Project No. →", projHint: "Enter project number",
+    hdrCode: "Designation", hdrDesc: "Description",
+    examples: ["First CAD piece, V1","First piece, revised","Second CAD piece, V1","First CAD assembly, V1","First electrical schema, V1","First cable list, V1","First program, V1"],
+    wfStart: "Create a new file", wfQuestion: "Is it a completely new object?",
+    wfYesLbl: "Yes", wfNoLbl: "No",
+    wfYesDesc: "New independent piece/plan/etc.",
+    wfNoDesc: "Modify/correct an existing object",
+    copied: "Copied!",
+    changelog: [
+      { version: "v1.0", date: "May 2026", changes: ["Initial system with P, A, E, C, S","Versioning with _001 and -V1","Multilingual support"] }
+    ]
+  },
+  it: {
+    settingsTitle: "Impostazioni", settingsTheme: "Tema", settingsLang: "Lingua", settingsExport: "Export",
+    themeNames: { beige: "Beige", white: "Bianco", dark: "Scuro", blue: "Blu" },
+    qrTitle: "Condividi questa pagina",
+    heroLabel: "Descrizione normalizzata interna",
+    heroTitle: "<strong>Sistema di</strong><br>designazione",
+    heroSub: "Standard di denominazione unificato per tutti i file di progetto.",
+    lblStructure: "Struttura", lblLegend: "Legenda", lblVersions: "Versioni", lblExamples: "Esempi",
+    lblWorkflow: "Diagramma decisionale", lblChangelog: "Cronologia versioni",
+    searchPlaceholder: "Cerca...", searchNoResults: "Nessun risultato",
+    fpType: "[Tipo]", fpProject: "[N° Progetto]", fpObject: "[Oggetto]", fpVersion: "[Versione]",
+    flType: "Tipo (P, A, E, C, S)", flNum: "Numero progetto + numero oggetto", flVer: "Versione del file",
+    legend: [["P","Pezzo"],["A","Assieme"],["E","Schema elettrico"],["C","Lista cavi"],["S","Software"]],
+    badgeObj: "N° Oggetto", badgeVer: "Versione",
+    descObj: "Nuovo oggetto indipendente dello stesso tipo nel progetto.",
+    descVer: "Revisione dello stesso oggetto (correzione, modifica).",
+    exObj1: "1° pezzo", exObj2: "2° pezzo", exVer1: "Originale", exVer2: "Corretto",
+    projLabel: "N° Progetto →", projHint: "Inserire il numero di progetto",
+    hdrCode: "Designazione", hdrDesc: "Descrizione",
+    examples: ["Primo pezzo CAD, V1","Primo pezzo, rivisto","Secondo pezzo CAD, V1","Primo assieme CAD, V1","Primo schema elettrico, V1","Prima lista cavi, V1","Primo programma, V1"],
+    wfStart: "Crea un nuovo file", wfQuestion: "È un oggetto completamente nuovo?",
+    wfYesLbl: "Sì", wfNoLbl: "No",
+    wfYesDesc: "Nuovo pezzo/piano indipendente",
+    wfNoDesc: "Modificare/correggere un oggetto esistente",
+    copied: "Copiato!",
+    changelog: [
+      { version: "v1.0", date: "Maggio 2026", changes: ["Sistema iniziale con P, A, E, C, S","Versioning con _001 e -V1","Supporto multilingue"] }
+    ]
+  }
+};
+
+const templates = [
+  { id: 'ex1', prefix: 'P', suffix: '_001-V1' },
+  { id: 'ex2', prefix: 'P', suffix: '_001-V2' },
+  { id: 'ex3', prefix: 'P', suffix: '_002-V1' },
+  { id: 'ex4', prefix: 'A', suffix: '_001-V1' },
+  { id: 'ex5', prefix: 'E', suffix: '_001-V1' },
+  { id: 'ex6', prefix: 'C', suffix: '_001-V1' },
+  { id: 'ex7', prefix: 'S', suffix: '_001-V1' },
+];
+
+let currentLang = 'de';
+let currentTheme = 'beige';
+
+function closeAllPanels() {
+  document.getElementById('settingsPanel').classList.remove('open');
+  document.getElementById('qrPanel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+
+function toggleSettings() {
+  const panel = document.getElementById('settingsPanel');
+  const wasOpen = panel.classList.contains('open');
+  closeAllPanels();
+  if (!wasOpen) {
+    panel.classList.add('open');
+    document.getElementById('overlay').classList.add('open');
+  }
+}
+
+function toggleQR() {
+  const panel = document.getElementById('qrPanel');
+  const wasOpen = panel.classList.contains('open');
+  closeAllPanels();
+  if (!wasOpen) {
+    panel.classList.add('open');
+    document.getElementById('overlay').classList.add('open');
+    renderQR();
+  }
+}
+
+function renderQR() {
+  const url = window.location.href;
+  document.getElementById('qrUrl').textContent = url;
+  const container = document.getElementById('qrcode');
+  container.innerHTML = '';
+  new QRCode(container, { text: url, width: 200, height: 200, colorDark: '#000', colorLight: '#fff' });
+}
+
+function setTheme(theme) {
+  currentTheme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  document.querySelectorAll('.theme-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.theme === theme);
+  });
+  localStorage.setItem('logicOrgTheme', theme);
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  const t = translations[lang];
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-lang]').forEach(el => {
+    el.classList.toggle('active', el.dataset.lang === lang);
+  });
+  document.getElementById('heroLabel').textContent = t.heroLabel;
+  document.getElementById('heroTitle').innerHTML = t.heroTitle;
+  document.getElementById('heroSub').textContent = t.heroSub;
+  document.getElementById('lblStructure').textContent = t.lblStructure;
+  document.getElementById('lblLegend').textContent = t.lblLegend;
+  document.getElementById('lblVersions').textContent = t.lblVersions;
+  document.getElementById('lblExamples').textContent = t.lblExamples;
+  document.getElementById('lblWorkflow').textContent = t.lblWorkflow;
+  document.getElementById('lblChangelog').textContent = t.lblChangelog;
+  document.getElementById('fpType').textContent = t.fpType;
+  document.getElementById('fpProject').textContent = t.fpProject;
+  document.getElementById('fpObject').textContent = t.fpObject;
+  document.getElementById('fpVersion').textContent = t.fpVersion;
+  document.getElementById('flType').textContent = t.flType;
+  document.getElementById('flNum').textContent = t.flNum;
+  document.getElementById('flVer').textContent = t.flVer;
+
+  const legendHtml = t.legend.map(([k, d]) =>
+    `<div class="legend-row"><div class="legend-key">${k}</div><div class="legend-desc">${d}</div></div>`
+  ).join('');
+  document.getElementById('legendTable').innerHTML = legendHtml;
+
+  document.getElementById('badgeObj').textContent = t.badgeObj;
+  document.getElementById('badgeVer').textContent = t.badgeVer;
+  document.getElementById('descObj').textContent = t.descObj;
+  document.getElementById('descVer').textContent = t.descVer;
+  document.getElementById('exObj1').textContent = t.exObj1;
+  document.getElementById('exObj2').textContent = t.exObj2;
+  document.getElementById('exVer1').textContent = t.exVer1;
+  document.getElementById('exVer2').textContent = t.exVer2;
+  document.getElementById('projLabel').textContent = t.projLabel;
+  document.getElementById('projHint').textContent = t.projHint;
+  document.getElementById('hdrCode').textContent = t.hdrCode;
+  document.getElementById('hdrDesc').textContent = t.hdrDesc;
+
+  t.examples.forEach((desc, i) => {
+    document.getElementById('exd' + (i+1)).textContent = desc;
+  });
+
+  document.getElementById('wfStart').textContent = t.wfStart;
+  document.getElementById('wfQuestion').textContent = t.wfQuestion;
+  document.getElementById('wfYesLbl').textContent = t.wfYesLbl;
+  document.getElementById('wfNoLbl').textContent = t.wfNoLbl;
+  document.getElementById('wfYesDesc').textContent = t.wfYesDesc;
+  document.getElementById('wfNoDesc').textContent = t.wfNoDesc;
+
+  const changelogHtml = t.changelog.map(e => `
+    <div class="cl-entry">
+      <div class="cl-date"><span class="cl-version">${e.version}</span><span>${e.date}</span></div>
+      <div class="cl-changes"><ul>${e.changes.map(c => `<li>${c}</li>`).join('')}</ul></div>
+    </div>
+  `).join('');
+  document.getElementById('changelogBox').innerHTML = changelogHtml;
+
+  document.getElementById('settingsTitleEl').textContent = t.settingsTitle;
+  document.getElementById('settingsThemeLbl').textContent = t.settingsTheme;
+  document.getElementById('settingsLangLbl').textContent = t.settingsLang;
+  document.getElementById('settingsExportLbl').textContent = t.settingsExport;
+  document.getElementById('qrTitleEl').textContent = t.qrTitle;
+  document.getElementById('searchInput').placeholder = t.searchPlaceholder;
+  document.querySelectorAll('[data-theme-name]').forEach(el => {
+    el.textContent = t.themeNames[el.dataset.themeName];
+  });
+
+  updateExamples();
+  localStorage.setItem('logicOrgLang', lang);
+}
+
+function updateExamples() {
+  const num = document.getElementById('projInput').value || '________';
+  templates.forEach(t => {
+    document.getElementById(t.id).textContent = t.prefix + num + t.suffix;
+  });
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 1600);
+}
+
+function copyText(id, sourceEl, btnEl) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('✓ ' + translations[currentLang].copied + ' ' + text);
+    if (btnEl) {
+      btnEl.classList.add('copied');
+      setTimeout(() => btnEl.classList.remove('copied'), 1000);
+    }
+  });
+}
+
+function handleSearch() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  document.getElementById('searchClear').classList.toggle('visible', q.length > 0);
+  document.querySelectorAll('.section').forEach(s => {
+    if (!q) { s.classList.remove('hidden'); return; }
+    const haystack = (s.dataset.search + ' ' + s.textContent).toLowerCase();
+    s.classList.toggle('hidden', !haystack.includes(q));
+  });
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  handleSearch();
+}
+
+function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const t = translations[currentLang];
+  const num = document.getElementById('projInput').value;
+
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Logic Organizer', 20, 25);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(120);
+  doc.text(t.heroLabel, 20, 33);
+
+  doc.setTextColor(30);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(t.lblStructure, 20, 48);
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(11);
+  doc.text('[Type][N° Projet]_[Objet]-[Version]', 20, 56);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(t.lblLegend, 20, 72);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  let y = 80;
+  t.legend.forEach(([k, d]) => {
+    doc.setFont('courier', 'bold');
+    doc.text(k, 20, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text('= ' + d, 30, y);
+    y += 6;
+  });
+
+  y += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(t.lblExamples + ' — N° ' + num, 20, y);
+  y += 8;
+  doc.setFontSize(9);
+  templates.forEach((tpl, i) => {
+    doc.setFont('courier', 'bold');
+    doc.text(tpl.prefix + num + tpl.suffix, 20, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(t.examples[i], 90, y);
+    doc.setTextColor(30);
+    y += 6;
+  });
+
+  doc.save('Logic_Organizer_' + num + '.pdf');
+  showToast('✓ PDF');
+}
+
+function exportExcel() {
+  const t = translations[currentLang];
+  const num = document.getElementById('projInput').value;
+
+  const data = [
+    ['Logic Organizer'],
+    [t.heroLabel],
+    [],
+    [t.lblStructure],
+    ['[Type][N° Projet]_[Objet]-[Version]'],
+    [],
+    [t.lblLegend],
+    ...t.legend.map(([k, d]) => [k, d]),
+    [],
+    [t.lblExamples + ' — N° ' + num],
+    [t.hdrCode, t.hdrDesc],
+    ...templates.map((tpl, i) => [tpl.prefix + num + tpl.suffix, t.examples[i]])
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 30 }, { wch: 50 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Logic Organizer');
+  XLSX.writeFile(wb, 'Logic_Organizer_' + num + '.xlsx');
+  showToast('✓ Excel');
+}
+
+const savedLang = localStorage.getItem('logicOrgLang') || 'de';
+const savedTheme = localStorage.getItem('logicOrgTheme') || 'beige';
+setTheme(savedTheme);
+setLang(savedLang);
+</script>
+</body>
+</html>
